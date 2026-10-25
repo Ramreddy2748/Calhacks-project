@@ -2,6 +2,8 @@
 
 An AI assistant for the phone calls you keep putting off. Built in stages from the supplied system architecture.
 
+![HoldOn dashboard showing service connections, call history, and controls for starting a new task](docs/images/holdon-dashboard.png)
+
 ## Run locally
 
 Use Node 22.14+ (required by the Vapi Web SDK) and Python 3.11+. From this directory:
