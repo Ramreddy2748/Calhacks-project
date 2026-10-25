@@ -4,6 +4,7 @@ import json
 import httpx
 
 from app.agents import Agents, NEGOTIATION_SCHEMA, parse_json
+from app.errors import AgentError
 
 
 def test_model_json_fences_are_supported_without_accepting_trailing_text():
@@ -22,6 +23,7 @@ def test_structured_claude_request_rejects_incomplete_or_refused_output(monkeypa
 
     def respond(request):
         payload = json.loads(request.content)
+        assert payload['max_tokens'] == 6000
         assert payload['output_config']['format'] == {'type': 'json_schema', 'schema': NEGOTIATION_SCHEMA}
         return httpx.Response(200, json={'stop_reason': stop_reason,
             'content': [{'type': 'text', 'text': '{}'}]})
@@ -32,5 +34,6 @@ def test_structured_claude_request_rejects_incomplete_or_refused_output(monkeypa
     if stop_reason == 'end_turn':
         assert asyncio.run(Agents().ask('Test', {}, schema=NEGOTIATION_SCHEMA)) == '{}'
     else:
-        with pytest.raises(ValueError, match='complete response'):
+        with pytest.raises(AgentError) as error:
             asyncio.run(Agents().ask('Test', {}, schema=NEGOTIATION_SCHEMA))
+        assert error.value.code == ('claude_output_limit' if stop_reason == 'max_tokens' else 'claude_refusal')

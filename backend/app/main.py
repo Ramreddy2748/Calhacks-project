@@ -28,6 +28,7 @@ from .spacetime import SpacetimeMirror
 from .sms import SmsDelivery
 from . import access
 from . import public_demo
+from .errors import error_code, error_message
 
 load_dotenv(Path(__file__).resolve().parents[1] / '.env')
 store = Store(os.getenv('DATABASE_PATH', str(Path(__file__).resolve().parents[1] / 'holdon.sqlite3')))
@@ -367,12 +368,13 @@ async def run(task_id):
             await simulate(task)
     except asyncio.CancelledError:
         raise
-    except Exception:
+    except Exception as error:
         logger.exception('Task execution failed: %s', task_id)
         task = require_task(task_id)
         task['status'] = 'failed'
         task.pop('next_speaker', None)
-        task['error'] = 'A provider or agent request failed. Check configuration and provider availability before retrying.'
+        task['error'] = error_message(error)
+        task['error_code'] = error_code(error)
         store.save(task)
 
 

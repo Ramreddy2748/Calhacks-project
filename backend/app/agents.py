@@ -1,8 +1,12 @@
 """Claude-backed agent roles with a deterministic offline demonstration."""
 import json
+import logging
 import os
 
 import httpx
+from .errors import AgentError
+
+logger = logging.getLogger('holdon.claude')
 
 NEGOTIATION_SCHEMA = {
     'type': 'object', 'additionalProperties': False,
@@ -13,10 +17,10 @@ NEGOTIATION_SCHEMA = {
             'properties': {'role': {'type': 'string', 'enum': ['assistant', 'representative']},
                            'text': {'type': 'string'}}, 'required': ['role', 'text']}},
         **{key: {'type': 'string'} for key in ['offer', 'reply', 'description',
-            'approved_reply', 'approved_result', 'declined_reply', 'declined_result']},
+            'approved_reply', 'approved_result']},
     },
     'required': ['action_type', 'opening', 'offer', 'reply', 'description',
-                 'approved_reply', 'approved_result', 'declined_reply', 'declined_result'],
+                 'approved_reply', 'approved_result'],
 }
 
 
@@ -40,9 +44,7 @@ class Agents:
                 'and text), offer (representative’s concrete proposed next action and exact terms), '
                 'reply (assistant pauses to ask the user), description (a specific approval question), '
                 'approved_reply (assistant communicates approval of precisely those terms), '
-                'approved_result (representative confirms the simulated result), '
-                'declined_reply (assistant refuses the proposal without committing), '
-                'declined_result (representative acknowledges no change). '
+                'approved_result (representative confirms the simulated result). '
                 'Every text field is actual spoken dialogue: use first person, contractions and ordinary phone manners. '
                 'Use one or two sentences per turn, ideally 10 to 35 words, never more than 60 words. '
                 'Never write stage directions or third-person narration such as "the representative reads" or '
@@ -72,21 +74,23 @@ class Agents:
                  'transcript': task.get('transcript', []),
                  'declined_proposals': task.get('approval_history', []),
                  'round': task.get('simulation_round', 1)}, schema=NEGOTIATION_SCHEMA)
-            proposal = parse_json(text)
+            try:
+                proposal = parse_json(text)
+            except ValueError as error:
+                raise AgentError('claude_invalid_response') from error
             if not isinstance(proposal, dict):
-                raise ValueError('Invalid negotiation object')
+                raise AgentError('claude_invalid_response')
             if proposal.get('action_type', 'commitment') not in {'information', 'commitment'}:
-                raise ValueError('Invalid negotiation action type')
+                raise AgentError('claude_invalid_response')
             opening = proposal.get('opening')
-            fields = ['offer', 'reply', 'description', 'approved_reply', 'approved_result',
-                      'declined_reply', 'declined_result']
+            fields = ['offer', 'reply', 'description', 'approved_reply', 'approved_result']
             if (not isinstance(opening, list) or not 4 <= len(opening) <= 8
                     or any(not isinstance(line, dict) or line.get('role') not in {'assistant', 'representative'}
                            or not isinstance(line.get('text'), str) or not 1 <= len(line['text']) <= 1500
                            for line in opening)
                     or any(not isinstance(proposal.get(key), str) or not 1 <= len(proposal[key]) <= 1500
                            for key in fields)):
-                raise ValueError('Invalid negotiation content')
+                raise AgentError('claude_invalid_response')
             # The disclosure is enforced independently of generated text.
             if not task.get('transcript'):
                 if opening[0]['role'] == 'assistant' and 'ai assistant' in opening[0]['text'].lower():
@@ -115,11 +119,11 @@ class Agents:
         return bool(os.getenv('ANTHROPIC_API_KEY') and os.getenv('ANTHROPIC_MODEL'))
 
     async def ask(self, system, payload, schema=None):
-        request = {'model': os.environ['ANTHROPIC_MODEL'], 'max_tokens': 2400,
+        request = {'model': os.environ['ANTHROPIC_MODEL'], 'max_tokens': 6000,
                    'system': system, 'messages': [{'role': 'user', 'content': json.dumps(payload)}]}
         if schema is not None:
             request['output_config'] = {'format': {'type': 'json_schema', 'schema': schema}}
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post('https://api.anthropic.com/v1/messages', headers={
                 'x-api-key': os.environ['ANTHROPIC_API_KEY'],
                 'anthropic-version': '2023-06-01',
@@ -127,8 +131,17 @@ class Agents:
             response.raise_for_status()
             result = response.json()
             if result.get('stop_reason') in {'max_tokens', 'refusal'}:
-                raise ValueError('Claude did not return a complete response')
-            return '\n'.join(b['text'] for b in result['content'] if b['type'] == 'text')
+                logger.warning('Claude stopped: reason=%s model=%s output_tokens=%s',
+                               result.get('stop_reason'), result.get('model', os.environ['ANTHROPIC_MODEL']),
+                               result.get('usage', {}).get('output_tokens'))
+            if result.get('stop_reason') == 'max_tokens':
+                raise AgentError('claude_output_limit')
+            if result.get('stop_reason') == 'refusal':
+                raise AgentError('claude_refusal')
+            text = '\n'.join(b['text'] for b in result['content'] if b['type'] == 'text')
+            if not text.strip():
+                raise AgentError('claude_invalid_response')
+            return text
 
     async def plan(self, task):
         if not self.configured or (task['mode'] == 'demo' and task.get('engine') != 'claude'):
@@ -148,9 +161,12 @@ class Agents:
             'add a bank dispute or other escalation the user did not ask for. '
             'For demo mode, every step and outcome is hypothetical.',
             {'goal': task['goal'], 'context': task['context'], 'mode': task['mode']})
-        steps = parse_json(text)
+        try:
+            steps = parse_json(text)
+        except ValueError as error:
+            raise AgentError('claude_invalid_response') from error
         if not isinstance(steps, list) or not 3 <= len(steps) <= 6 or not all(isinstance(s, str) for s in steps):
-            raise ValueError('Planner returned an invalid plan')
+            raise AgentError('claude_invalid_response')
         return steps
 
     async def report(self, task):

@@ -17,6 +17,7 @@ from uuid import uuid4
 from uagents import Agent, Context, Model
 from uagents.dispatch import dispatcher
 import uagents.agent as sdk_agent
+from .errors import AgentError, error_code
 
 
 class RoleRequest(Model):
@@ -32,6 +33,7 @@ class RoleResult(Model):
     task_id: str
     value: dict
     error: bool = False
+    error_code: str = ''
 
 
 ROLES = {'plan': 'Planner', 'negotiate': 'Negotiator', 'review': 'Guardrail',
@@ -40,7 +42,7 @@ logger = logging.getLogger('holdon.orchestration')
 
 
 class FetchOrchestrator:
-    def __init__(self, roles, timeout=40):
+    def __init__(self, roles, timeout=75):
         self.roles = roles
         self.timeout = timeout
         self.members = {}
@@ -91,7 +93,8 @@ class FetchOrchestrator:
                 if sender != expected_sender or result.task_id != task_id or future.done():
                     return
                 if result.error:
-                    future.set_exception(RuntimeError('uAgent role execution failed'))
+                    future.set_exception(AgentError(result.error_code) if result.error_code else
+                                         RuntimeError('uAgent role execution failed'))
                 else:
                     future.set_result(result.value)
 
@@ -121,10 +124,10 @@ class FetchOrchestrator:
                 value = await method(request.task, **request.arguments)
                 result = RoleResult(request_id=request.request_id, task_id=request.task_id,
                                     value={'result': value})
-            except Exception:
+            except Exception as error:
                 logger.exception('uAgent %s failed for task %s', name, request.task_id)
                 result = RoleResult(request_id=request.request_id, task_id=request.task_id,
-                                    value={}, error=True)
+                                    value={}, error=True, error_code=error_code(error))
             await ctx.send(sender, result)
 
     async def close(self):

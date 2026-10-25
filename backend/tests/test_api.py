@@ -10,6 +10,7 @@ os.environ['DEMO_STEP_SECONDS'] = '0.001'
 import pytest
 from fastapi.testclient import TestClient
 from app import main
+from app.errors import AgentError
 
 
 @pytest.fixture
@@ -194,6 +195,25 @@ def test_fetch_runtime_health_and_fail_closed_role_error(client, monkeypatch):
             return
         time.sleep(0.02)
     pytest.fail('A failed uAgent request did not fail the task')
+
+
+@pytest.mark.parametrize('code', ['claude_output_limit', 'claude_refusal', 'claude_timeout'])
+def test_provider_diagnostic_survives_agent_routing(client, monkeypatch, code):
+    async def broken_planner(task):
+        raise AgentError(code)
+
+    monkeypatch.setattr(main.agents.roles, 'plan', broken_planner)
+    task_id = client.post('/api/tasks', json={'goal': 'Ask about a lower subscription bill'}).json()['id']
+    deadline = time.monotonic() + 4
+    while time.monotonic() < deadline:
+        task = client.get(f'/api/tasks/{task_id}').json()
+        if task['status'] == 'failed':
+            break
+        time.sleep(0.02)
+    assert task['status'] == 'failed'
+    assert task['error_code'] == code
+    assert 'A provider or agent request failed' not in task['error']
+    assert task['approval'] is None
 
 
 def test_live_mode_requires_configuration_and_allowlisted_teammate(client, monkeypatch):
