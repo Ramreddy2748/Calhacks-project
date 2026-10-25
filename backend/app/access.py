@@ -14,15 +14,23 @@ LIFETIME = 12 * 60 * 60
 
 
 def required():
-    return os.getenv('HOLDON_REQUIRE_AUTH', '').lower() in {'1', 'true', 'yes'}
+    # Explicit public mode uses its own signed visitor-session gate.
+    public = os.getenv('HOLDON_PUBLIC_DEMO', '').lower() in {'1', 'true', 'yes'}
+    return not public and os.getenv('HOLDON_REQUIRE_AUTH', '').lower() in {'1', 'true', 'yes'}
+
+
+def origin():
+    return (os.getenv('PUBLIC_APP_URL') or os.getenv('RENDER_EXTERNAL_URL', '')).rstrip('/')
 
 
 def validate():
     if required():
-        origin = urlparse(os.getenv('PUBLIC_APP_URL', ''))
-        if (len(os.getenv('HOLDON_ACCESS_KEY', '')) < 32 or origin.scheme != 'https' or not origin.netloc
-                or origin.path not in {'', '/'} or origin.username or origin.password or origin.query or origin.fragment):
-            raise ValueError('Hosted mode requires a 32+ character HOLDON_ACCESS_KEY and HTTPS PUBLIC_APP_URL')
+        parsed = urlparse(origin())
+        if (len(os.getenv('HOLDON_ACCESS_KEY', '')) < 32 or parsed.scheme != 'https' or not parsed.netloc
+                or parsed.path not in {'', '/'} or parsed.username or parsed.password or parsed.query or parsed.fragment):
+            raise ValueError('Private workspace mode requires a 32+ character HOLDON_ACCESS_KEY and HTTPS PUBLIC_APP_URL '
+                             '(or RENDER_EXTERNAL_URL). For the public simulation, set HOLDON_PUBLIC_DEMO=1 '
+                             'and a 32+ character HOLDON_ACCESS_KEY in your hosting environment.')
 
 
 def signature(payload):
@@ -54,9 +62,9 @@ class AccessGate:
             path = scope['path']
             if path.startswith('/api/webhooks/') or path in {'/api/health', '/api/demo/session'}:
                 return await self.app(scope, receive, send)
-            origin = request.headers.get('origin')
-            expected = os.getenv('PUBLIC_APP_URL', '').rstrip('/')
-            if origin and origin.rstrip('/') != expected:
+            supplied_origin = request.headers.get('origin')
+            expected = origin()
+            if supplied_origin and supplied_origin.rstrip('/') != expected:
                 return await JSONResponse({'detail': 'Unexpected request origin'}, status_code=403)(scope, receive, send)
             if path != '/api/login' and not valid(request.cookies.get(COOKIE, '')):
                 return await JSONResponse({'detail': 'Sign in to this workspace'}, status_code=401)(scope, receive, send)

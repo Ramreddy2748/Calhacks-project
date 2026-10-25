@@ -112,7 +112,7 @@ def test_hosted_configuration_fails_closed(monkeypatch):
     monkeypatch.setenv('HOLDON_REQUIRE_AUTH', '1')
     monkeypatch.setenv('HOLDON_ACCESS_KEY', 'short')
     monkeypatch.setenv('PUBLIC_APP_URL', 'http://holdon.test')
-    with pytest.raises(ValueError, match='Hosted mode'):
+    with pytest.raises(ValueError, match='Private workspace mode'):
         access.validate()
 
 

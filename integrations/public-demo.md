@@ -17,6 +17,17 @@ origin. If you attach a custom domain, set `PUBLIC_APP_URL` to its HTTPS origin.
 The Blueprint generates the signing key; never copy provider keys into GitHub.
 Automatic redeploys are disabled. Deploy repository updates manually in Render.
 
+## Startup configuration errors
+
+If startup says "Hosted mode requires..." or "Private workspace mode requires...",
+open Render → service → Environment and set `HOLDON_PUBLIC_DEMO=1`,
+`HOLDON_REQUIRE_AUTH=0`, and `HOLDON_ACCESS_KEY` to a new random secret with at
+least 32 characters. Generate it locally with
+`python3 -c "import secrets; print(secrets.token_urlsafe(48))"`.
+These settings must be in Render, not only in your laptop's `.env` file.
+Remove any `PUBLIC_APP_URL` pointing to localhost; Render supplies its HTTPS
+origin automatically. Choose **Manual Deploy → Deploy latest commit** afterward.
+
 ## Enable Claude
 
 Initially the demo runs without paid provider credentials. To enable AI plans,

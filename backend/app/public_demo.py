@@ -17,7 +17,7 @@ def enabled():
 
 
 def origin():
-    return (os.getenv('PUBLIC_APP_URL') or os.getenv('RENDER_EXTERNAL_URL', '')).rstrip('/')
+    return access.origin()
 
 
 def validate():
@@ -27,7 +27,8 @@ def validate():
     if (access.required() or len(os.getenv('HOLDON_ACCESS_KEY', '')) < 32
             or parsed.scheme != 'https' or not parsed.netloc or parsed.username or parsed.password
             or parsed.path not in {'', '/'} or parsed.query or parsed.fragment):
-        raise ValueError('Public demo requires a 32+ character signing key, HTTPS origin, and workspace auth disabled')
+        raise ValueError('Public demo requires a 32+ character HOLDON_ACCESS_KEY and HTTPS PUBLIC_APP_URL '
+                         '(or the automatically supplied RENDER_EXTERNAL_URL). Set these in the hosting environment.')
 
 
 def visitor(token):

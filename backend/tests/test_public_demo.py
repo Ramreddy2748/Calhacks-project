@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main, public_demo
+from app import access, main, public_demo
 
 
 @pytest.fixture
@@ -71,3 +71,16 @@ def test_public_demo_rejects_unsafe_configuration(monkeypatch):
     monkeypatch.setenv('PUBLIC_APP_URL', 'https://holdon.test')
     with pytest.raises(ValueError):
         public_demo.validate()
+
+
+def test_render_public_mode_overrides_inherited_private_default(visitors, monkeypatch):
+    first, _ = visitors
+    monkeypatch.setenv('HOLDON_REQUIRE_AUTH', '1')  # Docker image default.
+    monkeypatch.delenv('PUBLIC_APP_URL')
+    monkeypatch.setenv('RENDER_EXTERNAL_URL', 'https://holdon.test')
+    assert not access.required()
+    access.validate()
+    public_demo.validate()
+    assert first.get('/api/demo/session').json()['public_demo']
+    assert first.get('/api/tasks').status_code == 200
+    assert first.get('/api/health').json()['login_required'] is False
