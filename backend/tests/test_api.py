@@ -67,7 +67,7 @@ def test_claude_simulation_uses_goal_and_waits_for_exact_decision(client, monkey
     monkeypatch.setenv('ANTHROPIC_MODEL', 'test-model')
     calls = []
 
-    async def generated(system, payload):
+    async def generated(system, payload, **kwargs):
         calls.append((system, payload))
         if 'Planner' in system:
             return json.dumps(['Disclose AI identity', 'Ask about refund eligibility', 'Get approval before proceeding'])
@@ -120,8 +120,43 @@ def test_claude_simulation_uses_goal_and_waits_for_exact_decision(client, monkey
     assert len(completed['approval_history']) == len(decisions)
     assert calls[0][1]['goal'] == 'Ask for a refund of a duplicate charge'
     assert calls[1][1]['context'] == 'Do not accept any fee.'
-    assert ('review is open' in completed['transcript'][-1]['text']) == decisions[-1]
+    assert any('review is open' in line['text'] for line in completed['transcript']) == decisions[-1]
     assert sum('Hi, I’m HoldOn' in line['text'] for line in completed['transcript']) == 1
+
+
+def test_informational_simulation_answers_without_a_commitment_approval(client, monkeypatch):
+    monkeypatch.setenv('ANTHROPIC_API_KEY', 'test-only')
+    monkeypatch.setenv('ANTHROPIC_MODEL', 'test-model')
+
+    async def generated(system, payload, **kwargs):
+        if 'Planner' in system:
+            return json.dumps(['Disclose AI', 'Ask what to check', 'Explain next steps without account actions'])
+        if 'Negotiator' in system:
+            return json.dumps({
+                'action_type': 'information',
+                'opening': [
+                    {'role': 'assistant', 'text': 'Hello, I am an AI assistant calling for my user.'},
+                    {'role': 'representative', 'text': 'Hi, how can I help?'},
+                    {'role': 'assistant', 'text': 'What should my user gather before asking about a refund?'},
+                    {'role': 'representative', 'text': 'Do they have their cancellation confirmation?'}],
+                'offer': 'Gather the cancellation confirmation and the charge date first. I can’t assess eligibility without those details.',
+                'reply': 'Thanks for explaining.', 'description': 'No action proposed.',
+                'approved_reply': 'Unused.', 'approved_result': 'Unused.',
+                'declined_reply': 'Unused.', 'declined_result': 'Unused.'})
+        assert payload['resolution'] == 'information_only'
+        assert payload['decision'] is None
+        return 'Simulation summary: Explained which documents to gather; no account changes or refund confirmed.'
+
+    monkeypatch.setattr(main.agents.roles, 'ask', generated)
+    task_id = client.post('/api/tasks', json={'goal': 'Explain what I need before asking for a refund'}).json()['id']
+    task = wait_for(client, task_id, 'completed')
+    assert task['approval'] is None
+    assert not task.get('approval_history')
+    assert task['resolution'] == 'information_only'
+    assert task['transcript'][0]['text'].startswith('Hi, I’m HoldOn')
+    assert sum('AI assistant' in line['text'] for line in task['transcript']) == 1
+    assert not task.get('next_speaker')
+    assert not any('hold detected' in item['message'] for item in task['activity'])
 
 
 def test_cancel_expires_pending_approval(client):

@@ -13,3 +13,5 @@
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
 
 .workspace-key{width:100%;padding:12px;border:1px solid #dce3d2;border-radius:7px;margin:0 0 18px;background:white;color:#2b4131;font-size:13px}.sms-preview{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:11px;line-height:1.8;background:#f0f4e8;padding:15px;border-radius:8px;margin:18px 0;max-height:250px;overflow:auto}.sms-consent{display:flex;gap:9px;align-items:flex-start;font-size:11px;line-height:1.7;color:#6a7c5c;margin:15px 0}.sms-consent input{margin-top:4px;flex-shrink:0}.sms-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}.sms-delivery{font-size:11px;line-height:1.8;color:#7b6a42}.summary .sms-launch{margin-left:auto}.summary .sms-launch+.button{margin-left:0}.modal-content>.modal-symbol{margin-bottom:22px}
+
+.next-reply{display:flex;align-items:center;gap:9px;padding:8px 0 16px 47px;color:#82936d;font-size:11px}

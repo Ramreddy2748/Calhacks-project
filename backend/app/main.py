@@ -318,6 +318,7 @@ async def cancel(task_id: str):
     if task['mode'] == 'live' or (task['mode'] == 'browser' and task['status'] not in {'planning', 'ready'}):
         raise HTTPException(409, 'End live calls in the Vapi dashboard; local cancellation cannot confirm a hangup.')
     task['status'] = 'cancelled'
+    task.pop('next_speaker', None)
     if task.get('approval') and task['approval']['status'] == 'pending':
         task['approval']['status'] = 'expired'
     store.save(task)
@@ -370,6 +371,7 @@ async def run(task_id):
         logger.exception('Task execution failed: %s', task_id)
         task = require_task(task_id)
         task['status'] = 'failed'
+        task.pop('next_speaker', None)
         task['error'] = 'A provider or agent request failed. Check configuration and provider availability before retrying.'
         store.save(task)
 
@@ -378,6 +380,15 @@ async def simulate(task):
     delay = float(os.getenv('DEMO_STEP_SECONDS', '1.5'))
     generated = task.get('engine') == 'claude'
     proposal = None
+
+    async def deliver(role, text):
+        task['next_speaker'] = role
+        store.save(task)
+        # Pace simulated turns by their length; tests can explicitly use zero delay.
+        pause = max(delay, min(4, len(text.split()) / 10)) if delay >= 0.01 else delay
+        await asyncio.sleep(pause)
+        task.pop('next_speaker', None)
+        say(task, role, text)
     if generated:
         log(task, 'Negotiator', 'Claude is preparing a goal-specific simulated conversation and proposed terms.')
         proposal = await agents.negotiate(task)
@@ -393,19 +404,25 @@ async def simulate(task):
     ]
     for role, text in opening:
         await asyncio.sleep(delay)
-        say(task, role, text)
-    task['status'] = 'on_hold'
-    log(task, 'Caller', 'Simulated hold detected. Waiting for the representative.')
-    await asyncio.sleep(delay * 2)
+        await deliver(role, text)
+    if not generated:
+        task['status'] = 'on_hold'
+        log(task, 'Caller', 'Simulated hold detected. Waiting for the representative.')
+        await asyncio.sleep(delay * 2)
     # Each rejection is scoped to a proposal, not to the whole conversation.
     max_proposals = 3 if generated else 1
     for round_index in range(max_proposals):
         task['status'] = 'in_progress'
-        say(task, 'representative', proposal['offer'] if generated else 'I can make the requested change with no added fee. May I proceed?')
+        await deliver('representative', proposal['offer'] if generated else 'I can make the requested change with no added fee. May I proceed?')
+        if generated and proposal.get('action_type') == 'information':
+            task['resolution'] = 'information_only'
+            log(task, 'Negotiator', 'Explained the available information. No account action or disclosure was requested, so no approval is needed.')
+            await deliver('assistant', 'Thanks for explaining. I’ll pass those next steps back to my user. Please leave the account unchanged.')
+            break
         log(task, 'Negotiator', f'Proposal {round_index + 1}: requesting your approval of these specific terms.')
         if proposal is None:
             proposal = await agents.negotiate(task)
-        say(task, 'assistant', proposal['reply'])
+        await deliver('assistant', proposal['reply'])
         task.pop('decision', None)
         task['approval'] = await agents.review(task, proposal['description'])
         task['status'] = 'awaiting_approval'
@@ -426,19 +443,21 @@ async def simulate(task):
         expired = task['approval']['status'] == 'expired'
         task['status'] = 'in_progress'
         if approved:
-            say(task, 'assistant', proposal['approved_reply'] if generated else 'My user approves this change with no added fee.')
+            await deliver('assistant', proposal['approved_reply'] if generated else 'My user approves this change with no added fee.')
             await asyncio.sleep(delay)
-            say(task, 'representative', proposal['approved_result'] if generated else
+            await deliver('representative', proposal['approved_result'] if generated else
                 'All set. Your confirmation number is HOLD-2048. Have a great day!')
+            if generated:
+                await deliver('assistant', 'Thank you. I’ll share that outcome and any follow-up steps with my user. Goodbye.')
             break
         if not generated or expired:
-            say(task, 'assistant', 'My user has not authorized this proposal. Please leave everything unchanged. Thank you.')
+            await deliver('assistant', 'My user has not authorized this proposal. Please leave everything unchanged. Thank you.')
             break
         # Model-generated decline text may imply hangup; enforce continuation here.
-        say(task, 'assistant', 'My user declined those terms. Please leave everything unchanged while we look for another option.')
-        say(task, 'representative', 'Understood. That proposal is declined; no change has been made.')
+        await deliver('assistant', 'My user declined those terms. Please leave everything unchanged while we look for another option.')
+        await deliver('representative', 'Understood. That proposal is declined; no change has been made.')
         if round_index + 1 == max_proposals:
-            say(task, 'assistant', 'We have reviewed three proposals without an agreement. I’ll stop here with no changes and summarize the options for my user.')
+            await deliver('assistant', 'We have reviewed three proposals without an agreement. I’ll stop here with no changes and summarize the options for my user.')
             log(task, 'Negotiator', 'Three proposals declined. Ending without agreement or account changes.')
             break
         task['simulation_round'] = round_index + 2
@@ -446,7 +465,7 @@ async def simulate(task):
         proposal = await agents.negotiate(task)
         for line in proposal['opening']:
             await asyncio.sleep(delay)
-            say(task, line['role'], line['text'])
+            await deliver(line['role'], line['text'])
     log(task, 'Reporter', 'Claude is summarizing the recorded conversation and your decision.' if generated else 'Preparing the simulation summary.')
     task['summary'] = await agents.report(task)
     task['status'] = 'completed'
