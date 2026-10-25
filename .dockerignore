@@ -1,0 +1,12 @@
+.git
+.venv
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+**/.env*
+**/*.sqlite3*
+.agents
+.codex
+.aws
+**/*.log

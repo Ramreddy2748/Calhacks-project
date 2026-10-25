@@ -147,3 +147,22 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# HoldOn local runtime and developer files
+node_modules/
+dist/
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+.env.*
+!.env.example
+*.sqlite3*
+.DS_Store
+*.log
+
+.aws/
+.codex/
+.agents/
+*.pem
+*.key

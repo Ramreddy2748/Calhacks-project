@@ -1,0 +1,33 @@
+services:
+  holdon:
+    build: .
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      HOLDON_REQUIRE_AUTH: '1'
+      DATABASE_PATH: /data/holdon.sqlite3
+    ports:
+      - '127.0.0.1:8000:8000'
+    volumes:
+      - holdon-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/api/health", timeout=5)']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  public-agent:
+    profiles: ['agentverse']
+    build: .
+    command: ['python', '-m', 'app.public_agent']
+    environment:
+      PYTHONPATH: /app/backend
+      AGENTVERSE_SEED: '${AGENTVERSE_SEED:-}'
+      AGENTVERSE_ENDPOINT: '${AGENTVERSE_ENDPOINT:-}'
+      AGENTVERSE_PORT: '8001'
+    ports:
+      - '127.0.0.1:8001:8001'
+    restart: unless-stopped
+volumes:
+  holdon-data:
