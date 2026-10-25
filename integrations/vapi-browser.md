@@ -13,7 +13,7 @@ still required; browser calls are not free provider service. If the Vapi balance
 2. Create a Vapi assistant with your account's supported voice, transcriber, and
    model. Use the goal/context/plan prompt and synchronous `request_approval`
    function described in [the assistant setup](vapi-assistant.md). This app
-   overrides the first message with an AI disclosure and browser role-play notice.
+   overrides the first message with a brief introduction and browser role-play notice.
 3. Set these in **backend/.env** (never paste private keys into frontend files):
 
    ```dotenv

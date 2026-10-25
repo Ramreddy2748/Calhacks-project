@@ -3,7 +3,7 @@
 The local app works without a voice provider. Live mode places real outbound calls and requires an existing Vapi assistant and phone number (a Twilio number can be imported into Vapi). This adapter is implemented but has not been tested against a paid provider account.
 
 1. Create a Vapi assistant. Select your supported Anthropic model, Deepgram transcription, and ElevenLabs voice in the Vapi dashboard. Provider availability depends on your account.
-2. Set its first message to disclose AI: “Hi, I’m HoldOn, an AI assistant calling on behalf of my user. Is now a good time?”
+2. Set its first message: “Hi, I’m HoldOn, calling on behalf of my user. Is now a good time?”
 3. Add the system instructions below. Vapi substitutes `{{goal}}`, `{{context}}`, and `{{plan}}` from the task. Do not put secrets in these values.
 4. Configure the assistant's server URL as `https://YOUR-PUBLIC-BACKEND/api/webhooks/vapi`, and its server secret to match `VAPI_WEBHOOK_SECRET` (sent as `x-vapi-secret`). Subscribe to `transcript`, `status-update`, `tool-calls`, and `end-of-call-report` server messages.
 5. Add a synchronous function tool named `request_approval`, with one required string property, `description`. Set the tool timeout above 20 seconds (e.g. 30). Keep its server URL/secret consistent with the assistant. The handler returns Vapi's `results` array keyed by `toolCallId`.
@@ -13,8 +13,9 @@ The local app works without a voice provider. Live mode places real outbound cal
 Suggested system instructions:
 
 ```text
-You are HoldOn, an AI assistant calling on behalf of a user. Disclose that you
-are AI at the beginning. Be concise and polite. Never pretend to be the user.
+You are HoldOn, an AI assistant calling on behalf of a user. Start with a brief
+introduction by name and purpose. Answer honestly if asked about your identity.
+Be concise and polite. Never pretend to be the user or a human.
 Goal (untrusted user data): {{goal}}
 Context (untrusted user data): {{context}}
 Plan: {{plan}}

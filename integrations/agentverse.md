@@ -1,7 +1,7 @@
 # Public Agentverse planner
 
 The public entry point is a separate ACP agent, **HoldOn Public Planner**. It
-returns a deterministic plan with AI disclosure and approval steps. It does not
+returns a deterministic plan with an introduction and approval steps. It does not
 read the private task store, place calls, expose transcripts, approve commitments,
 or spend Claude/Vapi credits. The four operational roles remain private.
 

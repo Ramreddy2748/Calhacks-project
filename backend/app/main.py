@@ -399,7 +399,7 @@ async def simulate(task):
     task['status'] = 'calling'
     log(task, 'Caller', 'Starting a simulated call. No phone number is dialed.')
     opening = [(line['role'], line['text']) for line in proposal['opening']] if generated else [
-        ('assistant', 'Hi, I’m HoldOn, an AI assistant calling on behalf of my user. Is now a good time?'),
+        ('assistant', 'Hi, I’m HoldOn, calling on behalf of my user. Is now a good time?'),
         ('representative', 'Of course. How can I help you today?'),
         ('assistant', f"My user’s goal is: {task['goal']}"),
         ('representative', 'Let me review the available options. Please hold for a moment.'),
@@ -505,7 +505,7 @@ async def browser_session(task_id: str):
     log(task, 'Caller', 'Connecting browser audio to Vapi. You play the representative; no phone number is dialed.')
     return {'session_token': token, 'public_key': os.environ['VAPI_PUBLIC_KEY'],
             'assistant_id': browser_assistant(), 'assistant_overrides': {
-                'firstMessage': 'Hi, I’m HoldOn, an AI assistant calling on behalf of my user. For this browser demo, you can play the representative. Is now a good time?',
+                'firstMessage': 'Hi, I’m HoldOn, calling on behalf of my user. For this browser demo, you can play the representative. Is now a good time?',
                 'clientMessages': ['transcript', 'speech-update', 'status-update'],
                 'variableValues': {'goal': task['goal'], 'context': task['context'],
                     'plan': '\n'.join(task['plan']), 'holdon_task_id': task_id, 'holdon_session': token}}}

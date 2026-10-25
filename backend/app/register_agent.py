@@ -14,7 +14,7 @@ def register():
     return register_chat_agent(name='HoldOn Public Planner', endpoint=endpoint, active=True,
         credentials=RegistrationRequestCredentials(agent_seed_phrase=seed, agentverse_api_key=key),
         description='Build a safe plan for a tedious phone call. Planning only; calls and approvals stay private.',
-        readme='# HoldOn Public Planner\nReturns a suggested plan with AI disclosure and approval steps. '
+        readme='# HoldOn Public Planner\nReturns a suggested plan with an introduction and approval steps. '
                'Does not place calls, expose private transcripts, access accounts, or authorize commitments.',
         metadata={'is_public': 'True', 'categories': ['productivity']})
 

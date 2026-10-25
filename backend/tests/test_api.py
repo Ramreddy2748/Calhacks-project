@@ -42,7 +42,8 @@ def test_demo_waits_for_approval_then_reports(client, approved):
     task = wait_for(client, task_id, 'awaiting_approval')
     assert task['approval']['status'] == 'pending'
     assert not task['summary']
-    assert task['plan'] and 'AI assistant' in task['transcript'][0]['text']
+    assert task['plan'] and 'calling on behalf of my user' in task['transcript'][0]['text']
+    assert 'AI assistant' not in task['transcript'][0]['text']
     assert client.post(f'/api/tasks/{task_id}/approvals/wrong-id', json={'approved': True}).status_code == 409
     path = f"/api/tasks/{task_id}/approvals/{task['approval']['id']}"
     assert client.post(path, json={'approved': approved}).status_code == 200
@@ -71,7 +72,7 @@ def test_claude_simulation_uses_goal_and_waits_for_exact_decision(client, monkey
     async def generated(system, payload, **kwargs):
         calls.append((system, payload))
         if 'Planner' in system:
-            return json.dumps(['Disclose AI identity', 'Ask about refund eligibility', 'Get approval before proceeding'])
+            return json.dumps(['Introduce HoldOn', 'Ask about refund eligibility', 'Get approval before proceeding'])
         if 'Negotiator' in system:
             return json.dumps({
                 'opening': [
@@ -131,7 +132,7 @@ def test_informational_simulation_answers_without_a_commitment_approval(client, 
 
     async def generated(system, payload, **kwargs):
         if 'Planner' in system:
-            return json.dumps(['Disclose AI', 'Ask what to check', 'Explain next steps without account actions'])
+            return json.dumps(['Introduce HoldOn', 'Ask what to check', 'Explain next steps without account actions'])
         if 'Negotiator' in system:
             return json.dumps({
                 'action_type': 'information',
@@ -155,7 +156,7 @@ def test_informational_simulation_answers_without_a_commitment_approval(client, 
     assert not task.get('approval_history')
     assert task['resolution'] == 'information_only'
     assert task['transcript'][0]['text'].startswith('Hi, I’m HoldOn')
-    assert sum('AI assistant' in line['text'] for line in task['transcript']) == 1
+    assert sum('AI assistant' in line['text'] for line in task['transcript']) == 0
     assert not task.get('next_speaker')
     assert not any('hold detected' in item['message'] for item in task['activity'])
 
@@ -365,7 +366,7 @@ def test_browser_config_does_not_require_phone_or_private_key(client, browser):
     assert config['assistant_id'] == 'browser-assistant'
     assert 'test-secret' not in str(config)
     assert config['assistant_overrides']['variableValues']['goal'] == browser['goal']
-    assert 'AI assistant' in config['assistant_overrides']['firstMessage']
+    assert 'calling on behalf of my user' in config['assistant_overrides']['firstMessage']
     assert client.post(f"/api/tasks/{browser['id']}/browser/session").status_code == 409
     # Client events cannot forge a user approval decision.
     assert browser_event(client, browser['id'], config, 'authorize').status_code == 422
