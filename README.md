@@ -33,7 +33,6 @@ npm run dev
 
 Open **http://127.0.0.1:5173**. API documentation: **http://127.0.0.1:8000/docs**.
 
-No keys are needed for the complete demo: create a call → see the plan → follow the simulated transcript and hold → approve or decline a proposed change → receive a summary. Demo mode uses the same persistence, event stream, approval endpoints, and dashboard as live mode, with a clearly labeled scripted conversation. It does not perform the requested task in the real world.
 
 ## Build sequence
 
