@@ -52,7 +52,7 @@ class AccessGate:
         if scope['type'] == 'http' and required() and scope['path'].startswith('/api/'):
             request = Request(scope)
             path = scope['path']
-            if path.startswith('/api/webhooks/') or path == '/api/health':
+            if path.startswith('/api/webhooks/') or path in {'/api/health', '/api/demo/session'}:
                 return await self.app(scope, receive, send)
             origin = request.headers.get('origin')
             expected = os.getenv('PUBLIC_APP_URL', '').rstrip('/')

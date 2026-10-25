@@ -27,6 +27,7 @@ from .store import Store, now
 from .spacetime import SpacetimeMirror
 from .sms import SmsDelivery
 from . import access
+from . import public_demo
 
 load_dotenv(Path(__file__).resolve().parents[1] / '.env')
 store = Store(os.getenv('DATABASE_PATH', str(Path(__file__).resolve().parents[1] / 'holdon.sqlite3')))
@@ -40,6 +41,7 @@ TERMINAL = {'completed', 'failed', 'cancelled', 'interrupted'}
 @asynccontextmanager
 async def lifespan(app):
     access.validate()
+    public_demo.validate()
     # A restarted process cannot safely resume a simulation or assume a live call ended.
     for task in store.all():
         if (task.get('sms') or {}).get('status') == 'sending':
@@ -71,6 +73,7 @@ app = FastAPI(title='HoldOn API', lifespan=lifespan,
 app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'],
                    allow_methods=['GET', 'POST'], allow_headers=['Content-Type', 'Last-Event-ID'])
 app.add_middleware(access.AccessGate)
+app.add_middleware(public_demo.PublicDemoGate, store=lambda: store)
 
 
 class LoginInput(BaseModel):
@@ -179,10 +182,12 @@ def browser_configured():
 async def health(request: Request):
     if access.required() and not access.valid(request.cookies.get(access.COOKIE, '')):
         return {'ok': True, 'access_protected': True, 'login_required': True}
-    return {'ok': True, 'demo': True, 'claude': agents.configured, 'live': live_configured(),
-            'browser': browser_configured(),
+    return {'ok': True, 'demo': True, 'claude': agents.configured,
+            'public_demo': public_demo.enabled(),
+            'live': live_configured() and not public_demo.enabled(),
+            'browser': browser_configured() and not public_demo.enabled(),
             'spacetime': app.state.spacetime.info(),
-            'sms': sms.info(),
+            'sms': {'configured': False, 'recipient': None} if public_demo.enabled() else sms.info(),
             'access_protected': access.required(),
             'login_required': access.required() and not access.valid(request.cookies.get(access.COOKIE, '')),
             'storage': 'SQLite + SSE', 'orchestration': 'Fetch.ai uAgents (local)',
@@ -190,8 +195,16 @@ async def health(request: Request):
 
 
 @app.get('/api/tasks')
-async def list_tasks():
-    return store.all()
+async def list_tasks(request: Request):
+    tasks = store.all()
+    if public_demo.enabled():
+        tasks = [task for task in tasks if task.get('visitor_id') == request.state.visitor_id]
+    return tasks
+
+
+@app.get('/api/demo/session')
+async def demo_session():
+    return {'public_demo': False}
 
 
 @app.get('/api/tasks/{task_id}')
@@ -253,7 +266,13 @@ async def refresh_sms_status(task_id: str):
 
 
 @app.post('/api/tasks', status_code=201)
-async def create_task(data: TaskInput):
+async def create_task(data: TaskInput, request: Request):
+    if public_demo.enabled():
+        if data.mode != 'demo':
+            raise HTTPException(403, 'The public demo supports simulations only; no real calls or SMS.')
+        error = public_demo.creation_error(store, request.state.visitor_id)
+        if error:
+            raise HTTPException(429, error)
     if not agents.ready:
         raise HTTPException(503, 'Fetch.ai orchestration is unavailable')
     if not data.goal.strip() or len(data.goal.strip()) < 5:
@@ -271,6 +290,8 @@ async def create_task(data: TaskInput):
             'plan': [], 'transcript': [], 'activity': [], 'approval': None, 'summary': None,
             'error': None, 'provider_call_id': None,
             'engine': 'claude' if agents.configured else 'scripted'}
+    if public_demo.enabled():
+        task['visitor_id'] = request.state.visitor_id
     store.save(task)
     launch(task['id'], run(task['id']))
     return task
@@ -389,7 +410,7 @@ async def simulate(task):
         task['approval'] = await agents.review(task, proposal['description'])
         task['status'] = 'awaiting_approval'
         log(task, 'Guardrail', 'Paused for your decision. No action has been authorized.')
-        for _ in range(600):
+        for _ in range(120 if public_demo.enabled() else 600):
             await asyncio.sleep(0.5)
             task = require_task(task['id'])
             if task['status'] == 'cancelled':

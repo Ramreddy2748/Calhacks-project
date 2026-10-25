@@ -1,0 +1,23 @@
+# Public simulation only. Free hosting uses temporary storage, not durable accounts.
+services:
+  - type: web
+    name: holdon-demo
+    runtime: docker
+    plan: free
+    numInstances: 1
+    autoDeployTrigger: "off"
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOLDON_PUBLIC_DEMO
+        value: "1"
+      - key: HOLDON_REQUIRE_AUTH
+        value: "0"
+      - key: HOLDON_ACCESS_KEY
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /data/holdon.sqlite3
+      - key: PUBLIC_DEMO_DAILY_LIMIT
+        value: "20"
+      - key: DEMO_STEP_SECONDS
+        value: "1"

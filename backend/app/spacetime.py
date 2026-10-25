@@ -49,6 +49,7 @@ class SpacetimeMirror:
             # Internal transport bookkeeping is not useful in a shared mirror.
             snapshot['task'].pop('browser_session_hash', None)
             snapshot['task'].pop('browser_events', None)
+            snapshot['task'].pop('visitor_id', None)
             payload = [self.store.metadata('stream_id'), seq, task_id, json.dumps(snapshot)]
             response = await self.client.post(
                 f'{self.url}/v1/database/{quote(self.database, safe="")}/call/sync_task',

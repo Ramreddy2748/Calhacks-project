@@ -4,6 +4,14 @@ An AI assistant for the phone calls you keep putting off. Built in stages from t
 
 ![HoldOn dashboard showing service connections, call history, and controls for starting a new task](docs/images/holdon-dashboard.png)
 
+## Share a public demo
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Ramreddy2748/Calhacks-project)
+
+Create a Render account, click the button, and review the **Free** web service before deploying. Render provides an HTTPS link after deployment. See [the public demo guide](integrations/public-demo.md) for enabling Claude and verifying visitor isolation. No public deployment is created by committing this configuration.
+
+The public demo gives each visitor a signed browser session and separate task history. Real calls, SMS, and provider webhooks are disabled. Without API credentials it runs the offline simulation; add Claude credentials in Render's environment settings for AI-generated conversations. Free hosting sleeps when idle and **history and usage counters can reset on restarts/redeploys**. This is a temporary demonstration, not durable user accounts or production hosting.
+
 ## Run locally
 
 Use Node 22.14+ (required by the Vapi Web SDK) and Python 3.11+. From this directory:
