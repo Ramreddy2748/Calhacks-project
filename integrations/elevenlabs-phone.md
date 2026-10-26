@@ -24,6 +24,22 @@ or a Telnyx connection ID in `ELEVENLABS_PHONE_NUMBER_ID`.
 Use a separate protected service for phone testing. The existing public demo
 remains simulation-only and rejects outbound calls, even when credentials exist.
 
+The repository includes [`render-phone.yaml`](../render-phone.yaml) for this
+service. In Render, create a new Blueprint from this repository and choose
+`render-phone.yaml` as its Blueprint Path. Review the `holdon-phone` service:
+it uses Free hosting with temporary storage and generates separate workspace
+and approval-tool secrets. Enter your existing Claude key and model, ElevenLabs
+key, agent ID, imported phone-number ID, and your own approved destination.
+Retrieve the generated `ELEVENLABS_TOOL_SECRET` from Render when configuring
+the approval tool below. Use `HOLDON_ACCESS_KEY` to sign into this workspace.
+
+The webhook needs the new service URL. If Render asks for its secret before
+the service exists, enter a temporary random value, create the service, then
+register the post-call webhook using its URL. Replace the temporary value with
+ElevenLabs' actual webhook secret and redeploy before testing any call. Complete
+the agent prompt and approval tool below before calling, too. A healthy service
+does not prove the provider account, phone routing or webhooks are valid.
+
 Set the values in [the phone configuration template](elevenlabs-phone.env.example)
 in Render's Environment settings. Use a new random 32+ character signing key and
 a different random tool secret. Keep all private keys out of GitHub. Render

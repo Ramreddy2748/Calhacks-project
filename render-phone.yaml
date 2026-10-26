@@ -1,0 +1,38 @@
+# Separate, password-protected phone testing service. Creating this Blueprint
+# does not purchase a phone number or place a call. Free storage is temporary.
+services:
+  - type: web
+    name: holdon-phone
+    runtime: docker
+    plan: free
+    numInstances: 1
+    autoDeployTrigger: "off"
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOLDON_PUBLIC_DEMO
+        value: "0"
+      - key: HOLDON_REQUIRE_AUTH
+        value: "1"
+      - key: HOLDON_ACCESS_KEY
+        generateValue: true
+      - key: PHONE_PROVIDER
+        value: elevenlabs
+      - key: DATABASE_PATH
+        value: /data/holdon.sqlite3
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_AGENT_ID
+        sync: false
+      - key: ELEVENLABS_PHONE_NUMBER_ID
+        sync: false
+      - key: ELEVENLABS_WEBHOOK_SECRET
+        sync: false
+      - key: ELEVENLABS_TOOL_SECRET
+        generateValue: true
+      - key: ALLOWED_PHONE_NUMBERS
+        sync: false
