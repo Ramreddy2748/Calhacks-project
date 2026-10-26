@@ -419,7 +419,7 @@ async def simulate(task):
         if generated and proposal.get('action_type') == 'information':
             task['resolution'] = 'information_only'
             log(task, 'Negotiator', 'Explained the available information. No account action or disclosure was requested, so no approval is needed.')
-            await deliver('assistant', 'Thanks for explaining. I’ll pass those next steps back to my user. Please leave the account unchanged.')
+            await deliver('assistant', 'Got it, thanks. I’ll pass that along.')
             break
         log(task, 'Negotiator', f'Proposal {round_index + 1}: requesting your approval of these specific terms.')
         if proposal is None:
@@ -450,16 +450,16 @@ async def simulate(task):
             await deliver('representative', proposal['approved_result'] if generated else
                 'All set. Your confirmation number is HOLD-2048. Have a great day!')
             if generated:
-                await deliver('assistant', 'Thank you. I’ll share that outcome and any follow-up steps with my user. Goodbye.')
+                await deliver('assistant', 'Thanks for your help. I’ll pass that along. Have a good day.')
             break
         if not generated or expired:
             await deliver('assistant', 'My user has not authorized this proposal. Please leave everything unchanged. Thank you.')
             break
         # Model-generated decline text may imply hangup; enforce continuation here.
-        await deliver('assistant', 'My user declined those terms. Please leave everything unchanged while we look for another option.')
-        await deliver('representative', 'Understood. That proposal is declined; no change has been made.')
+        await deliver('assistant', 'They’d like to pass on that. Please don’t change anything. What else could we try?')
+        await deliver('representative', 'Sure, I haven’t changed anything. Let’s look at another option.')
         if round_index + 1 == max_proposals:
-            await deliver('assistant', 'We have reviewed three proposals without an agreement. I’ll stop here with no changes and summarize the options for my user.')
+            await deliver('assistant', 'We haven’t found a suitable option. Let’s leave things as they are. Thanks for checking.')
             log(task, 'Negotiator', 'Three proposals declined. Ending without agreement or account changes.')
             break
         task['simulation_round'] = round_index + 2
