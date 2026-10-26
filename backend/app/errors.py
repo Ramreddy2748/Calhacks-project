@@ -2,6 +2,7 @@
 import httpx
 
 MESSAGES = {
+    'phone_unconfirmed': 'The phone call request could not be confirmed. Check ElevenLabs and your carrier before trying again; the call may already have started.',
     'claude_output_limit': 'Claude reached its response limit before finishing. Try a shorter scenario; your transcript is saved.',
     'claude_refusal': 'Claude declined to generate this scenario. Your transcript is saved; no generated result was accepted.',
     'claude_invalid_response': 'Claude returned an invalid response. Your transcript is saved; please try again.',

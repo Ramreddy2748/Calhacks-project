@@ -218,6 +218,7 @@ def test_provider_diagnostic_survives_agent_routing(client, monkeypatch, code):
 
 
 def test_live_mode_requires_configuration_and_allowlisted_teammate(client, monkeypatch):
+    monkeypatch.setenv('PHONE_PROVIDER', 'vapi')
     monkeypatch.delenv('VAPI_API_KEY', raising=False)
     assert client.post('/api/tasks', json={'goal': 'Call my teammate', 'mode': 'live'}).status_code == 503
     for key in ['VAPI_API_KEY', 'VAPI_PHONE_NUMBER_ID', 'VAPI_ASSISTANT_ID', 'VAPI_WEBHOOK_SECRET']:
@@ -235,6 +236,7 @@ def test_webhook_authentication(client, monkeypatch):
 
 
 def test_live_phone_adapter_sends_only_the_confirmed_allowlisted_number(client, monkeypatch):
+    monkeypatch.setenv('PHONE_PROVIDER', 'vapi')
     import json
     import httpx
     monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)

@@ -14,6 +14,12 @@ The public demo gives each visitor a signed browser session and separate task hi
 
 ## Run locally
 
+For real outbound phone calls using **ElevenLabs + a SIP carrier**, see
+[the phone setup guide](integrations/elevenlabs-phone.md). Vapi is not required
+for this path. The public demo stays simulation-only; use a protected workspace
+with an approved destination and available carrier funds. The adapter is tested
+with mocked provider responses; no real call has been verified yet.
+
 Use Node 22.14+ (required by the Vapi Web SDK) and Python 3.11+. From this directory:
 
 ```sh
@@ -39,13 +45,13 @@ Open **http://127.0.0.1:5173**. API documentation: **http://127.0.0.1:8000/docs*
 1. **Dashboard — implemented.** React + Tailwind CSS, responsive overview, goal/context form, call history, live transcript, agent activity, approval controls, summary and JSON export. A call-stage workflow shows recorded progress through the four roles, including holds, approval decisions, and stopped sessions. The connection panel checks backend and Fetch.ai runtime readiness, distinguishes configured Claude/Vapi credentials from verified provider access, and clears stale readiness after failed health checks.
 2. **Backend — implemented.** FastAPI, validated task creation, SQLite persistence, replayable server-sent events, cancellation and restart recovery. All timestamps persist in UTC and display in the browser's locale.
 3. **Fetch.ai orchestration — implemented locally.** Five real uAgents (Orchestrator, Planner, Negotiator, Guardrail, Reporter) exchange typed request/result messages through the SDK’s local dispatcher. Each request has a unique correlation ID, expected sender, task ID, timeout, and cancellation cleanup. Guardrail creates approval requests and checks the exact user-approved record; it cannot approve actions itself. The deterministic demo covers the entire loop. Claude planning, simulated negotiation, and reporting use `ANTHROPIC_API_KEY` plus an explicitly selected `ANTHROPIC_MODEL`. Without those settings, the demo stays deterministic.
-4. **Voice — browser integration and phone adapter implemented; provider setup needed.** Browser mode includes microphone permission handling, start/end and mute controls, Vapi SDK captions, persistent final transcripts, authenticated backend approval tools, and end-of-session reporting. No telephone number or private Vapi API key is required for browser mode. See [browser voice setup](integrations/vapi-browser.md). Real Vapi audio still needs account credentials and has not been verified in this environment. The phone adapter includes Vapi outbound calls, authenticated transcript/status webhooks, a synchronous approval tool, and end-of-call reporting. See [live setup](integrations/vapi-assistant.md). An imported Twilio number and Vapi-configured Deepgram/ElevenLabs can supply the lower voice loop from the diagram. No real call has been made or verified as part of this build.
+4. **Voice — browser integration and phone adapter implemented; provider setup needed.** Browser mode includes microphone permission handling, start/end and mute controls, Vapi SDK captions, persistent final transcripts, authenticated backend approval tools, and end-of-session reporting. No telephone number or private Vapi API key is required for browser mode. See [browser voice setup](integrations/vapi-browser.md). Real Vapi audio still needs account credentials and has not been verified in this environment. The legacy phone adapter includes Vapi outbound calls, authenticated transcript/status webhooks, a synchronous approval tool, and end-of-call reporting. See [live setup](integrations/vapi-assistant.md). An imported Twilio number and Vapi-configured Deepgram/ElevenLabs can supply the lower voice loop from the diagram. No real call has been made or verified as part of this build.
 5. **SpacetimeDB — event mirror implemented.** A private module stores ordered task events and latest snapshots. The backend drains its durable SQLite outbox with retry and persistent checkpoints. Dashboard updates still use SSE; SQLite remains the recovery store. See [SpacetimeDB setup](integrations/spacetime.md).
 6. **Summary SMS — adapter and explicit-send UI implemented.** Preview and confirm each message, inspect provider status, and block duplicate/ambiguous retries. Twilio credentials, a sender, a recipient, and credits are still needed; no real text has been sent. See [SMS setup](integrations/sms.md).
 7. **Public Agentverse — standalone planner and registration command implemented.** The ACP planner returns suggestions without private account access or paid calls. Account credentials and a public endpoint are still needed to register and verify it. See [Agentverse setup](integrations/agentverse.md).
 8. **Deployment — Docker packaging and hosted workspace gate implemented.** The image serves the dashboard and API together, with secure sign-in cookies and persistent storage. Cloud account, HTTPS origin, and public deployment remain outstanding. See [deployment setup](integrations/deployment.md).
 
-Live replies still run in Vapi; the local Negotiator generates Claude-powered simulation proposals when configured. Fetch.ai routes planning, approval checks, and reporting. Real phone calling remains the existing allowlisted-teammate adapter and requires provider setup and credits.
+Live replies still run in Vapi; the local Negotiator generates Claude-powered simulation proposals when configured. Fetch.ai routes planning, approval checks, and reporting. The ElevenLabs SIP phone adapter requires an agent, a carrier-backed number, approval webhooks, and carrier funds. The legacy Vapi phone adapter is opt-in with `PHONE_PROVIDER=vapi`.
 
 ## Layout
 

@@ -28,6 +28,7 @@ from .spacetime import SpacetimeMirror
 from .sms import SmsDelivery
 from . import access
 from . import public_demo
+from . import elevenlabs_phone
 from .errors import error_code, error_message
 
 load_dotenv(Path(__file__).resolve().parents[1] / '.env')
@@ -167,6 +168,10 @@ def launch(task_id, coroutine):
 
 
 def live_configured():
+    if os.getenv('PHONE_PROVIDER', 'elevenlabs') == 'elevenlabs':
+        return elevenlabs_phone.configured()
+    if os.getenv('PHONE_PROVIDER') != 'vapi':
+        return False
     return all(os.getenv(k) for k in ['VAPI_API_KEY', 'VAPI_PHONE_NUMBER_ID',
                                      'VAPI_ASSISTANT_ID', 'VAPI_WEBHOOK_SECRET', 'ALLOWED_PHONE_NUMBERS'])
 
@@ -185,6 +190,7 @@ async def health(request: Request):
         return {'ok': True, 'access_protected': True, 'login_required': True}
     return {'ok': True, 'demo': True, 'claude': agents.configured,
             'public_demo': public_demo.enabled(),
+            'phone_provider': os.getenv('PHONE_PROVIDER', 'elevenlabs'),
             'live': live_configured() and not public_demo.enabled(),
             'browser': browser_configured() and not public_demo.enabled(),
             'spacetime': app.state.spacetime.info(),
@@ -285,12 +291,14 @@ async def create_task(data: TaskInput, request: Request):
             raise HTTPException(503, 'Live calling is not configured. Use demo mode.')
         allowed = {p.strip() for p in os.getenv('ALLOWED_PHONE_NUMBERS', '').split(',')}
         if not data.teammate_confirmed or not re.fullmatch(r'\+[1-9]\d{7,14}', data.phone) or data.phone not in allowed:
-            raise HTTPException(422, 'Live demos require a confirmed, allowlisted teammate number in E.164 format')
+            raise HTTPException(422, 'Phone calls require an explicitly confirmed, allowlisted number in E.164 format')
     task = {'id': str(uuid4()), **data.model_dump(), 'goal': data.goal.strip(),
             'status': 'planning', 'created_at': now(), 'updated_at': now(),
             'plan': [], 'transcript': [], 'activity': [], 'approval': None, 'summary': None,
             'error': None, 'provider_call_id': None,
             'engine': 'claude' if agents.configured else 'scripted'}
+    if data.mode == 'live':
+        task['phone_provider'] = os.getenv('PHONE_PROVIDER', 'elevenlabs')
     if public_demo.enabled():
         task['visitor_id'] = request.state.visitor_id
     store.save(task)
@@ -317,7 +325,8 @@ async def cancel(task_id: str):
     if task['status'] in TERMINAL:
         return task
     if task['mode'] == 'live' or (task['mode'] == 'browser' and task['status'] not in {'planning', 'ready'}):
-        raise HTTPException(409, 'End live calls in the Vapi dashboard; local cancellation cannot confirm a hangup.')
+        provider = 'ElevenLabs' if task.get('phone_provider') == 'elevenlabs' else 'Vapi'
+        raise HTTPException(409, f'End live calls in the {provider} dashboard; local cancellation cannot confirm a hangup.')
     task['status'] = 'cancelled'
     task.pop('next_speaker', None)
     if task.get('approval') and task['approval']['status'] == 'pending':
@@ -475,6 +484,9 @@ async def simulate(task):
 
 
 async def start_live(task):
+    if task.get('phone_provider') == 'elevenlabs':
+        await elevenlabs_phone.start(task, store, log)
+        return
     # Use an existing, reviewed Vapi assistant; never improvise a voice configuration.
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post('https://api.vapi.ai/call',
@@ -576,7 +588,8 @@ async def vapi_webhook(request: Request, x_vapi_secret: str = Header(default='')
     message = payload.get('message', {})
     call = message.get('call', {})
     call_id = call.get('id')
-    task = next((t for t in store.all() if t.get('provider_call_id') == call_id and call_id), None)
+    task = next((t for t in store.all() if t.get('provider_call_id') == call_id and call_id
+                 and t.get('phone_provider', 'vapi') == 'vapi'), None)
     if not task and call_id:
         # Vapi can send its first webhook before start() resolves in the browser.
         variables = (call.get('assistantOverrides') or {}).get('variableValues') or {}
@@ -673,6 +686,8 @@ async def vapi_webhook(request: Request, x_vapi_secret: str = Header(default='')
         fresh['summary'] = task['summary']
         log(fresh, 'Reporter', 'Provider reported the call ended. Summary ready.')
     return {'ok': True}
+
+elevenlabs_phone.attach_routes(app, lambda: store, agents, log)
 
 # Docker serves the built dashboard and API from one HTTPS origin. Development
 # still uses Vite's /api proxy. Mount last so API routes retain precedence.

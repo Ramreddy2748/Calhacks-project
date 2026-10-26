@@ -16,7 +16,7 @@ export function workflowFor(task) {
     { name: 'Planner', state: planned ? 'done' : stopped ? 'stopped' : task.status === 'planning' ? 'current' : 'pending',
       detail: planned ? 'Plan ready' : ended ? 'No plan recorded' : task.status === 'planning' ? 'Preparing the plan' : 'Up next' },
     { name: 'Negotiator', state: waiting ? 'paused' : conversationActive ? 'current' : conversationStarted && ended ? 'done' : stopped ? 'stopped' : 'pending',
-      detail: waiting ? 'Paused for your decision' : task.status === 'on_hold' ? 'Waiting on hold' : conversationActive ? (task.mode === 'demo' ? 'Simulated conversation' : task.mode === 'browser' ? 'Browser voice via Vapi' : 'Conversation via Vapi') : conversationStarted && ended ? 'Conversation ended' : stopped ? 'Stopped' : task.status === 'awaiting_approval' && decision ? 'Decision received' : 'Up next' },
+      detail: waiting ? 'Paused for your decision' : task.status === 'on_hold' ? 'Waiting on hold' : conversationActive ? (task.mode === 'demo' ? 'Simulated conversation' : task.mode === 'browser' ? 'Browser voice via Vapi' : task.phone_provider === 'elevenlabs' ? 'Phone call via ElevenLabs' : 'Conversation via Vapi') : conversationStarted && ended ? 'Conversation ended' : stopped ? 'Stopped' : task.status === 'awaiting_approval' && decision ? 'Decision received' : 'Up next' },
     { name: 'Guardrail', state: waiting ? 'waiting' : decision ? (approval.status === 'approved' ? 'done' : 'resolved') : stopped ? 'stopped' : 'pending',
       detail: waiting ? 'Needs your approval' : decision || (ended ? 'No approval recorded' : 'Checks commitments with you') },
     { name: 'Reporter', state: task.summary ? 'done' : stopped ? 'stopped' : 'pending',
